@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>KO ↔ EN 영작 토글 트레이너</title>
+
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="apple-touch-icon" href="./icons/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#0a84ff" />
+
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --fg: #111111;
+    --muted: #888888;
+    --border: #e5e5e5;
+    --accent: #007aff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e0e0f;
+      --fg: #f5f5f7;
+      --muted: #9b9ba1;
+      --border: #2a2a2c;
+      --accent: #0a84ff;
+    }
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif; }
+  header { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(10px);
+    background: color-mix(in srgb, var(--bg) 80%, transparent);
+    border-bottom: 1px solid var(--border); padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between; }
+  header h1 { margin: 0; font-size: 1rem; font-weight: 600; }
+  header button { background: none; border: 0; color: var(--accent); font-size: 1rem; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  textarea { width: 100%; min-height: 120px; font-size: 1rem; border: 1px solid var(--border);
+    border-radius: 8px; background: transparent; color: inherit; padding: 10px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 16px; }
+  .toolbar button { border: 1px solid var(--border); background: transparent; color: inherit;
+    padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+  .toolbar button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .card { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin: 10px 0; }
+  .line { margin: 6px 0; word-break: break-word; }
+  .lang-label { font-size: .8rem; color: var(--muted); margin-right: 6px; user-select: none; }
+  .toggle { cursor: pointer; display: inline-block; padding: 2px 0; transition: filter .15s, color .15s, text-shadow .15s; }
+  .hidden-text { color: transparent !important; text-shadow: 0 0 14px rgba(0,0,0,.25);
+    filter: blur(2px) grayscale(1); background: rgba(127,127,127,.1); border-radius: 4px; }
+  .small { font-size: .85rem; color: var(--muted); }
+  .settings-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4);
+    display: none; align-items: center; justify-content: center; z-index: 9999; }
+  .settings { width: min(92%, 480px); background: var(--bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+  .settings h2 { margin: 0 0 12px; font-size: 1.1rem; }
+  .settings label { font-size: .9rem; color: var(--muted); display: block; margin-top: 12px; }
+  .settings input { width: 100%; border: 1px solid var(--border); background: transparent; color: inherit;
+    border-radius: 8px; padding: 8px; font-family: monospace; font-size: .9rem; }
+  .settings .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .settings .row > * { flex: 1; }
+  .settings .buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .settings .buttons button { border: 1px solid var(--border); background: transparent; color: inherit;
+    padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+  .settings .buttons button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .danger { color: #ff3b30; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+  .export-area { width: 100%; min-height: 120px; font-size: .85rem; border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px; background: transparent; color: inherit; }
+</style>
+</head>
+<body>
+<header>
+  <h1>KO ↔ EN 영작 토글 트레이너</h1>
+  <button id="openSettings">설정</button>
+</header>
+
+<main>
+  <p class="small">
+    • 한국어 문장을 입력하고 <b>영작 만들기</b>를 누르면 (API 키 입력 시) 영어 문장을 자동 생성합니다.<br/>
+    • 카드에서 <b>KO/EN 문장을 탭</b>하면 해당 부분을 가릴 수 있습니다.<br/>
+    • GitHub Pages(고정 URL)에서 동작하므로 localStorage가 안전하게 유지됩니다.
+  </p>
+
+  <textarea id="koInput" placeholder="한국어 문장을 입력하세요. (예: 최대한 빠르게 회신 드리겠습니다.)"></textarea>
+
+  <div class="toolbar">
+    <button id="composeBtn" class="primary">영작 만들기</button>
+    <button id="selfAddBtn">직접 EN 입력해서 추가</button>
+    <button id="hideAllKoBtn">모든 KO 가리기</button>
+    <button id="hideAllEnBtn">모든 EN 가리기</button>
+    <button id="showAllBtn">모두 보이기</button>
+    <button id="exportBtn">Export</button>
+    <button id="importBtn">Import</button>
+    <button id="clearBtn" class="danger">전체 삭제</button>
+  </div>
+
+  <div id="cards"></div>
+</main>
+
+<!-- Settings modal -->
+<div class="settings-backdrop" id="settingsModal">
+  <div class="settings">
+    <h2>설정</h2>
+
+    <label>OpenAI API Key (선택)</label>
+    <input id="apiKeyInput" type="password" placeholder="sk-..." autocomplete="off" />
+
+    <div class="row">
+      <div>
+        <label>Model</label>
+        <input id="modelInput" type="text" value="gpt-4o-mini" />
+      </div>
+      <div>
+        <label>Temperature</label>
+        <input id="tempInput" type="number" min="0" max="1" step="0.1" value="0.3" />
+      </div>
+    </div>
+
+    <label>프롬프트(영작 톤/규칙 커스터마이즈)</label>
+    <textarea id="systemPromptInput" class="export-area" placeholder="시스템 프롬프트를 입력하세요."></textarea>
+
+    <details style="margin-top: 12px;">
+      <summary class="small">Export / Import (JSON)</summary>
+      <textarea id="exportArea" class="export-area mono" placeholder="Export를 누르면 여기에 JSON이 나타납니다. Import 시에 이 칸에 붙여넣고 Import 버튼을 다시 눌러주세요."></textarea>
+    </details>
+
+    <div class="buttons">
+      <button id="resetSettings" class="danger">설정 초기화</button>
+      <button id="closeSettings">닫기</button>
+      <button id="saveSettings" class="primary">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function safeParse(str) { try { return JSON.parse(str); } catch { return null; } }
+function getDefaultConfig() {
+  return {
+    apiKey: "",
+    model: "gpt-4o-mini",
+    temperature: 0.3,
+    systemPrompt: `You are a top-tier English writing tutor for Korean learners.
+- Return ONLY the natural English composition (no quotes, no explanations).
+- If the Korean sentence is informal or awkward, make it appropriate for business or neutral daily English depending on the context.`
+  };
+}
+let data   = safeParse(localStorage.getItem("pairs"))  || [];
+let config = safeParse(localStorage.getItem("config")) || getDefaultConfig();
+function persist()       { localStorage.setItem("pairs",  JSON.stringify(data)); }
+function persistConfig() { localStorage.setItem("config", JSON.stringify(config)); }
+
+const els = {
+  koInput: document.getElementById("koInput"),
+  composeBtn: document.getElementById("composeBtn"),
+  selfAddBtn: document.getElementById("selfAddBtn"),
+  clearBtn: document.getElementById("clearBtn"),
+  cards: document.getElementById("cards"),
+  hideAllKoBtn: document.getElementById("hideAllKoBtn"),
+  hideAllEnBtn: document.getElementById("hideAllEnBtn"),
+  showAllBtn: document.getElementById("showAllBtn"),
+  exportBtn: document.getElementById("exportBtn"),
+  importBtn: document.getElementById("importBtn"),
+  settingsModal: document.getElementById("settingsModal"),
+  openSettings: document.getElementById("openSettings"),
+  closeSettings: document.getElementById("closeSettings"),
+  saveSettings: document.getElementById("saveSettings"),
+  resetSettings: document.getElementById("resetSettings"),
+  apiKeyInput: document.getElementById("apiKeyInput"),
+  modelInput: document.getElementById("modelInput"),
+  tempInput: document.getElementById("tempInput"),
+  systemPromptInput: document.getElementById("systemPromptInput"),
+  exportArea: document.getElementById("exportArea")
+};
+
+function escapeHTML(str="") {
+  return str
+    .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+}
+function render() {
+  els.cards.innerHTML = "";
+  data.forEach((item, idx) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    const ko = escapeHTML(item.ko ?? "");
+    const en = escapeHTML(item.en ?? "");
+    card.innerHTML = `
+      <div class="line">
+        <span class="lang-label">[KO]</span>
+        <span class="toggle ko">${ko || "<i>(비어 있음)</i>"}</span>
+      </div>
+      <div class="line">
+        <span class="lang-label">[EN]</span>
+        <span class="toggle en">${en || "<i>(비어 있음)</i>"}</span>
+      </div>
+      <div class="small" style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button data-edit="${idx}" style="border:1px solid var(--border);background:transparent;color:inherit;padding:4px 8px;border-radius:6px;">수정</button>
+        <button data-delete="${idx}" style="border:1px solid var(--border);background:transparent;color:#ff3b30;padding:4px 8px;border-radius:6px;">삭제</button>
+      </div>
+    `;
+    els.cards.appendChild(card);
+  });
+  els.cards.querySelectorAll(".toggle").forEach(el => el.addEventListener("click", () => el.classList.toggle("hidden-text")));
+  els.cards.querySelectorAll("button[data-edit]").forEach(btn => btn.addEventListener("click", () => editItem(Number(btn.dataset.edit))));
+  els.cards.querySelectorAll("button[data-delete]").forEach(btn => btn.addEventListener("click", () => {
+    const idx = Number(btn.dataset.delete);
+    if (!confirm("삭제할까요?")) return;
+    data.splice(idx, 1); persist(); render();
+  }));
+}
+function toggleAll(lang, hide) {
+  document.querySelectorAll(`.${lang}`).forEach(el => hide ? el.classList.add("hidden-text") : el.classList.remove("hidden-text"));
+}
+
+async function compose() {
+  const ko = els.koInput.value.trim();
+  if (!ko) return alert("한국어 문장을 입력하세요.");
+  if (!config.apiKey) {
+    alert("API Key가 설정되어 있지 않습니다. 설정(우상단)에서 키를 넣거나, ‘직접 EN 입력해서 추가’를 사용하세요.");
+    return;
+  }
+  const payload = {
+    model: config.model || "gpt-4o-mini",
+    temperature: Number(config.temperature ?? 0.3),
+    max_tokens: 120,
+    messages: [
+      { role: "system", content: config.systemPrompt || getDefaultConfig().systemPrompt },
+      { role: "user", content: ko }
+    ]
+  };
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${config.apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || "API 요청 실패");
+    }
+    const json = await res.json();
+    const en = json.choices?.[0]?.message?.content?.trim() ?? "";
+    data.unshift({ ko, en }); persist();
+    els.koInput.value = ""; render();
+  } catch (e) {
+    alert("오류: " + e.message);
+    console.error(e);
+  }
+}
+function selfAdd() {
+  const ko = els.koInput.value.trim();
+  const en = prompt("영어 문장을 직접 입력하세요.") || "";
+  if (!ko && !en) return;
+  data.unshift({ ko, en }); persist();
+  els.koInput.value = ""; render();
+}
+function editItem(idx) {
+  const item = data[idx];
+  const ko = prompt("KO 수정", item.ko ?? "") ?? item.ko;
+  const en = prompt("EN 수정", item.en ?? "") ?? item.en;
+  data[idx] = { ko, en }; persist(); render();
+}
+function openSettings() {
+  els.apiKeyInput.value = config.apiKey || "";
+  els.modelInput.value = config.model || "gpt-4o-mini";
+  els.tempInput.value = Number(config.temperature ?? 0.3);
+  els.systemPromptInput.value = config.systemPrompt || getDefaultConfig().systemPrompt;
+  els.exportArea.value = "";
+  els.settingsModal.style.display = "flex";
+}
+function closeSettings() { els.settingsModal.style.display = "none"; }
+function saveSettings() {
+  config.apiKey = els.apiKeyInput.value.trim();
+  config.model = els.modelInput.value.trim() || "gpt-4o-mini";
+  config.temperature = Number(els.tempInput.value || 0.3);
+  config.systemPrompt = els.systemPromptInput.value || getDefaultConfig().systemPrompt;
+  persistConfig(); closeSettings();
+}
+function resetSettings() { if (confirm("설정을 초기화할까요?")) { config = getDefaultConfig(); persistConfig(); openSettings(); } }
+function exportData() {
+  const json = JSON.stringify(data, null, 2);
+  if (els.settingsModal.style.display !== "flex") openSettings();
+  els.exportArea.value = json;
+  try { els.exportArea.focus(); els.exportArea.select(); document.execCommand("copy"); alert("Export 내용을 클립보드에 복사했습니다."); }
+  catch(e) { alert("Export 완료 (복사는 수동으로 해주세요)."); }
+}
+function importData() {
+  if (els.settingsModal.style.display !== "flex") openSettings();
+  const text = els.exportArea.value.trim();
+  if (!text) return alert("Import할 JSON을 붙여넣으세요.");
+  try {
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed)) throw new Error("JSON 배열 형식이 아닙니다.");
+    if (!confirm("기존 데이터를 덮어씌울까요?")) return;
+    data = parsed; persist(); render(); alert("Import 완료!");
+  } catch (e) { alert("Import 실패: " + e.message); }
+}
+function clearAll() { if (confirm("정말 모든 카드를 삭제할까요?")) { data = []; persist(); render(); } }
+
+render();
+els.composeBtn.addEventListener("click", compose);
+els.selfAddBtn.addEventListener("click", selfAdd);
+els.clearBtn.addEventListener("click", clearAll);
+els.hideAllKoBtn.addEventListener("click", () => toggleAll("ko", true));
+els.hideAllEnBtn.addEventListener("click", () => toggleAll("en", true));
+els.showAllBtn.addEventListener("click", () => {
+  document.querySelectorAll(".toggle").forEach(el => el.classList.remove("hidden-text"));
+});
+els.exportBtn.addEventListener("click", exportData);
+els.importBtn.addEventListener("click", importData);
+els.openSettings.addEventListener("click", openSettings);
+els.closeSettings.addEventListener("click", closeSettings);
+els.saveSettings.addEventListener("click", saveSettings);
+els.resetSettings.addEventListener("click", resetSettings);
+els.settingsModal.addEventListener("click", (e) => { if (e.target === els.settingsModal) closeSettings(); });
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(console.error);
+  });
+}
+</script>
+</body>
+</html>
